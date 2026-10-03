@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Runs the plain C# game logic and its EditMode tests outside Unity, so they can run in CI or any
+    machine with the .NET SDK. The same files compile in Unity as Game.Core / Game.Logic / Game.Tests.
+    Unity-only folders (Core/Unity, Data, UI, Editor) are not included here.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <!-- Match Unity's C# version so code that compiles here also compiles in the Editor. -->
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- Test classes do not need XML docs. -->
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="../../Assets/_Game/Scripts/Core/**/*.cs" Exclude="../../Assets/_Game/Scripts/Core/Unity/**" />
+    <Compile Include="../../Assets/_Game/Scripts/Merge/**/*.cs" />
+    <Compile Include="../../Assets/_Game/Scripts/Economy/**/*.cs" />
+    <Compile Include="../../Assets/_Game/Scripts/Base/**/*.cs" />
+    <Compile Include="../../Assets/_Game/Scripts/Battle/**/*.cs" />
+    <Compile Include="../../Assets/_Game/Scripts/Campaign/**/*.cs" />
+    <Compile Include="../../Assets/Tests/EditMode/**/*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Unity's test framework ships NUnit 3.x; stay on 3.x so assertions behave the same. -->
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="NUnit" Version="3.14.0" />
+    <PackageReference Include="NUnit3TestAdapter" Version="4.6.0" />
+  </ItemGroup>
+</Project>
