@@ -25,6 +25,12 @@ namespace Game.Data
         [Tooltip("Currencies, buildings, offline earnings and HQ levels.")]
         [SerializeField] private EconomyConfigAsset economyConfig;
 
+        [Tooltip("Battle rules and unit stats.")]
+        [SerializeField] private BattleConfigAsset battleConfig;
+
+        [Tooltip("Campaign levels.")]
+        [SerializeField] private CampaignConfigAsset campaignConfig;
+
         [Header("Display")]
         [Tooltip("Target frame rate on device.")]
         [SerializeField] private int targetFrameRate = 60;
@@ -38,6 +44,12 @@ namespace Game.Data
 
         /// <summary>Currencies, buildings, offline earnings and HQ levels.</summary>
         public EconomyConfigAsset EconomyConfig => economyConfig;
+
+        /// <summary>Battle rules and unit stats.</summary>
+        public BattleConfigAsset BattleConfig => battleConfig;
+
+        /// <summary>Campaign levels.</summary>
+        public CampaignConfigAsset CampaignConfig => campaignConfig;
 
         /// <summary>Target frame rate on device.</summary>
         public int TargetFrameRate => targetFrameRate;

@@ -44,7 +44,7 @@ namespace Game.Editor
 
             BuildBoot(config);
             BuildBase();
-            BuildPlaceholder(SceneNames.Battle, BattleBackground, "Battle\n(arrives in Phase 4)");
+            BuildBattle();
 
             EditorBuildSettings.scenes = new[]
             {
@@ -90,6 +90,15 @@ namespace Game.Editor
             Save(scene, SceneNames.Base);
         }
 
+        private static void BuildBattle()
+        {
+            var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            CreateCamera(BattleBackground);
+            CreateEventSystem();
+            new GameObject("Battle Screen").AddComponent<BattleScreen>();
+            Save(scene, SceneNames.Battle);
+        }
+
         /// <summary>
         /// Adds an EventSystem for UI input. Uses the Input System's UI module (looked up by name so this compiles
         /// without a hard reference), falling back to the legacy module.
@@ -105,14 +114,6 @@ namespace Game.Editor
         }
 
         private const string InputSystemUiModule = "UnityEngine.InputSystem.UI.InputSystemUIInputModule";
-
-        private static void BuildPlaceholder(string name, Color background, string caption)
-        {
-            var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
-            CreateCamera(background);
-            new GameObject("Placeholder").AddComponent<ScenePlaceholder>().SetCaption(caption);
-            Save(scene, name);
-        }
 
         private static void CreateCamera(Color background)
         {

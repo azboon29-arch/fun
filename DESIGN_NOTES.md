@@ -98,3 +98,48 @@ It catches API and type errors, but not Unity 6-specific API changes.
 - Offline gold is added immediately. The popup only reports it, so closing the app before tapping Collect loses nothing.
 - If the clock moves backwards (the device time was changed), nothing is paid and the game carries on from the new time.
 - `OffsetClock` lets the debug panel fake time away without changing the device clock.
+
+## Phase 4
+
+### Determinism
+- The simulation uses only integers: positions in milli-cells, HP and damage as `long`, time in ticks, an integer
+  square root for distances, and per-mille multipliers (1500 = ×1.5). No floats, so every device gets the same result.
+- One `DeterministicRandom` per battle, seeded from the level, used only for the damage spread.
+- Units act in creation order (player formation row by row, then the enemy), and units killed in a tick stay in the
+  list with 0 HP so ids never shift.
+- A running FNV-1a checksum of every event and every unit's HP and position each tick fingerprints the battle;
+  the determinism test runs one large mixed battle 100 times and compares the full state.
+- Movement rounds each step away from zero so a unit can never stall one milli-cell outside its range.
+- The ScriptableObjects store friendly numbers (cells, seconds, ×1.9) and convert them to integers once at boot.
+
+### Rules
+- Field: the player's front row is 2.5 cells below the centre line and the enemy's 2.5 above; rows are 1 cell apart,
+  lanes 1 cell apart.
+- Targeting: frontmost enemy row that still has a living unit, then nearest, then lowest HP, then lowest id.
+  "Row" means the formation row a unit started in, so the back row stays protected even if front units move.
+- Defeat on wipe-out or when the time limit ends; a draw counts as a defeat.
+- Stars: win; win with no losses; win within the level's fast-win seconds.
+
+### Unit numbers (BattleConfig asset)
+| Unit | HP | Attack | Every | Range | Speed |
+|---|---|---|---|---|---|
+| Infantry | 100 | 12 | 1 s | 1.2 cells | 1.5 cells/s |
+| Artillery | 60 | 18 | 1.5 s | 5 cells | 0.8 cells/s |
+| Armor | 200 | 10 | 1.25 s | 1.5 cells | 1 cell/s |
+
+HP and attack grow ×1.9 per level. The power shown on the planning screen is `sqrt(HP × damage per second)`, so it
+also grows ×1.9 per level. It ignores counters, range and placement, which is why it is labelled a rough guide.
+
+### Test levels (CampaignConfig asset)
+- 1-1 Border Post: 2 Infantry L1; limit 4; 300 gold; fast win 8 s.
+- 1-2 River Crossing: 2 Infantry L2, 1 Artillery L1; limit 5; 600 gold; fast win 10 s.
+- 1-3 Iron Gate: Armor L3, 2 Infantry L2, Artillery L2; limit 6; 1,200 gold; fast win 12 s.
+- Probe runs: three L1 Infantry win 1-1 in about 6 s; two L1 Infantry lose it. An Armor L3 mix wins 1-3 in about
+  12 s; an all-L2 mix loses it. Battles last 6 to 20 s.
+- Every win pays the level's gold, so replays can be farmed for now; Phase 6 balancing may reduce replay rewards.
+- Gems: 1 per star the first time it is earned.
+
+### Retry and seeds
+- Each level has a fixed seed, so the same formation always produces the same battle. Results come from the player's
+  choices, not from retrying for a lucky roll. Retry returns to planning with the formation kept; pressing Fight
+  without changes replays the same battle. Changing to a seed per attempt is a one-line change in `BattleService`.

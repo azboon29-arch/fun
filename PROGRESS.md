@@ -5,7 +5,7 @@
 | 1. Foundation | Code done; waiting for first open in the Unity Editor |
 | 2. Merge Board | Code done; waiting for an Editor play test |
 | 3. Economy and Base | Code done; waiting for an Editor play test |
-| 4. Battle Core | Not started |
+| 4. Battle Core | Code done; waiting for an Editor play test |
 | 5. Strategy Layer | Not started |
 | 6. Campaign Content and Tools | Not started |
 | 7. Polish | Not started |
@@ -119,5 +119,50 @@
 7. Buy a Barracks. Unit prices on the buy buttons drop by 2%.
 8. Run the tests: **Window > General > Test Runner > EditMode > Run All** (114 tests).
 
-## Next: Phase 4, Battle Core
-Deterministic simulation, unit stats and counters, targeting rules, formation grid, battle view, result screen.
+## Phase 4: Battle Core
+
+### Done
+- `BattleSimulation` (plain C#, integer math only): fixed 20 steps per second, one seeded RNG, the same setup always
+  gives the same battle. Units move toward their target until in range, then attack on a cooldown.
+- Targeting: only enemies in the frontmost row that still has a living unit can be targeted, then the nearest, then
+  the lowest HP. So the front row takes the hits and the back row is safe until it falls.
+- Counters: Infantry beats Artillery, Artillery beats Armor, Armor beats Infantry, +50% damage (configurable).
+  Damage has a small seeded ±5% spread.
+- Stats grow ×1.9 per merge level (HP and attack), so power grows about ×1.9 per merge.
+- Result: victory, or defeat by wipe-out or time limit. Stars: win, win with no losses, win within the level's fast-win time.
+- `Formation`: a 3x5 grid (front, middle, back) with the level's deployment limit. A board unit can be placed once;
+  a remembered formation drops units that were merged or moved away on the board.
+- `BattleService`: roster of board units (strongest first), Auto fill, tap to add, swap slots, rewards
+  (gold per win, gems for each new star), best stars per level saved under `campaign`, next level unlocks on a win.
+  Units are never lost in battle.
+- `BattleConfig` asset (rules and the three unit types) and `CampaignConfig` asset (three test levels), both created
+  by Build Scenes.
+- Battle scene built from code:
+  - Planning: the scouted enemy formation, your formation grid, the power comparison marked as a rough guide,
+    a roster you drag from (or tap), Auto, Clear and Fight.
+  - Battle: units with HP bars, smoothed movement, damage numbers (gold when a counter applied), 1x/2x speed, Retreat.
+  - Result: Victory or Defeat, the three star objectives, rewards, a tip after a defeat saying which class beat
+    yours, and Retry (back to planning with the same formation), Next level and Base.
+- 166 tests in total. The 52 new ones include running the same battle 100 times with identical results, front-row
+  protection, targeting order, counters, range and movement, time limit, stars, formation rules, rewards and saving.
+
+### How to try it in the Editor
+1. Run **Tools > Merge Command > Build Scenes** again. It adds the BattleConfig and CampaignConfig assets and builds
+   the Battle scene.
+2. Press **Play**. Buy three Infantry (or use **▶ Debug > +10,000 gold** first), then tap **Battle**.
+3. The planning screen shows level 1-1 with two enemy Infantry at the top and your units already placed by Auto.
+   Drag a unit from the roster onto a slot, drag placed units between slots, tap one to remove it.
+4. Tap **Fight!**. Try the **1x/2x** button. The result panel shows stars and the gold reward.
+5. Tap **Retry**: your formation is still there. Tapping Fight again with no change replays the exact same battle.
+6. Win 1-1 to unlock 1-2 (use **>** in the top bar or **Next level**). Lose on purpose with one Infantry against 1-3
+   to see the defeat tip.
+7. Stop and press Play again: best stars and unlocked levels are restored.
+8. Run the tests: **Window > General > Test Runner > EditMode > Run All** (166 tests).
+
+### Known issues
+- Not yet run inside Unity (same as Phases 1 to 3).
+- The commander ability pick, traits and the full campaign map come in Phases 5 and 6.
+- Units are drawn as colored circles with labels; art and sound come in Phase 7.
+
+## Next: Phase 5, Strategy Layer
+Commander abilities, unit traits, and the systems that make planning choices matter.
