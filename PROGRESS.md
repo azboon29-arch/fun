@@ -4,7 +4,7 @@
 |---|---|
 | 1. Foundation | Code done; waiting for first open in the Unity Editor |
 | 2. Merge Board | Code done; waiting for an Editor play test |
-| 3. Economy and Base | Not started |
+| 3. Economy and Base | Code done; waiting for an Editor play test |
 | 4. Battle Core | Not started |
 | 5. Strategy Layer | Not started |
 | 6. Campaign Content and Tools | Not started |
@@ -72,7 +72,6 @@
   1080x1920 reference, touch targets at least 132 px.
 - Feedback hooks: merge punch animation, buy pop-in, and sound hooks (`IAudioService`, silent until Phase 7).
 - `Tools > Merge Command > Validate Data` checks the merge config.
-- Debug overlay (tap "▶ Debug"): Grow board button to test expansion.
 - 86 tests in total; 39 new for merge rules and edge cases (full board, max level, invalid drags, prices,
   buy level, save round trip, damaged save data, RNG determinism).
 
@@ -83,15 +82,42 @@
 3. Tap **Infantry** twice, then drag one Infantry onto the other: they merge into L2 with a bounce.
 4. Drag an item to an empty slot (move) and onto a different item (swap).
 5. Keep buying until the board is full: a message says so and nothing is lost.
-6. Open **▶ Debug** and tap **Grow board** to test expansion (up to 6x7). Stop and press Play again: the board,
-   prices and size are restored from the save.
+6. Stop and press Play again: the board, prices and size are restored from the save. (Since Phase 3 the board grows
+   through HQ upgrades instead of the debug button.)
 7. Run the tests: **Window > General > Test Runner > EditMode > Run All** (86 tests).
 
 ### Known issues
-- Gold is unlimited until Phase 3 adds the economy (`UnlimitedWallet`).
 - Text uses Unity's built-in font through legacy uGUI Text, not TextMeshPro yet (see DESIGN_NOTES.md).
 - Not yet run inside Unity: the Unity-side code was compile-checked against Unity reference assemblies
   (UnityEngine 2021.1 and UnityEngine.UI 2020.3), not Unity 6.
 
-## Next: Phase 3, Economy and Base
-Currencies, gold mines, barracks, warehouse, HQ upgrades, offline earnings, EconomyConfig.
+## Phase 3: Economy and Base
+
+### Done
+- `CurrencyWallet`: Gold and Gems that never go negative and never overflow, saved under `wallet`. It now pays for board purchases.
+- `EconomyService`:
+  - Gold Mines earn `base × 2.1^(level−1)` gold per second while you play, with fractional gold carried between frames.
+  - A gap longer than 60 s (app closed or in the background) is paid as offline earnings. The default cap is 8 h,
+    each Warehouse level adds 0.5 h, and the cap stops at 24 h. These earnings are reported for the "Welcome back" popup.
+  - Barracks give 2% off units per level, capped at 50%.
+- `HqService`: HQ levels 1 to 10 set the board size (4x5 up to 6x7) and the highest buy level. They are re-applied after every load.
+- `EconomyConfig` asset (`Assets/_Game/Data/EconomyConfig.asset`, created by Build Scenes) holds every number above,
+  plus the starting balances (500 gold) and the HQ level table.
+- Base screen: gold, income per second and gems in the top bar, an HQ button that opens the upgrade popup,
+  a "Welcome back" popup after time away, and buy buttons dimmed when you can't afford them.
+- Debug overlay: **+10,000 gold**, and **Away 2h**, which jumps the game clock forward to trigger offline earnings.
+- 114 tests in total. The 28 new ones cover the wallet, income while playing and away (with a mocked clock), caps,
+  Warehouses, Barracks, HQ upgrades and limits, and save/reload of all of it.
+
+### How to try it in the Editor
+1. Run **Tools > Merge Command > Build Scenes** again. It adds the EconomyConfig asset and keeps your other assets.
+2. Press **Play**. You start with 500 gold. Buy a **Gold Mine** and watch the gold climb.
+3. Buy a second Gold Mine and merge the two. The income shown in the top bar goes up.
+4. Tap **HQ 1**, then use **▶ Debug > +10,000 gold** and **Upgrade**. The board grows to 5x5.
+5. Tap **Away 2h** in the debug panel. The "Welcome back" popup shows what your mines earned.
+6. Stop Play, wait a few minutes, and press Play again. Offline earnings are paid on return.
+7. Buy a Barracks. Unit prices on the buy buttons drop by 2%.
+8. Run the tests: **Window > General > Test Runner > EditMode > Run All** (114 tests).
+
+## Next: Phase 4, Battle Core
+Deterministic simulation, unit stats and counters, targeting rules, formation grid, battle view, result screen.
