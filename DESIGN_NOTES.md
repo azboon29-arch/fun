@@ -66,8 +66,7 @@ not written by hand (spec Section 2). They get committed after the first open (P
 - Max level 30 for every type. All of these live in the asset, not in code.
 
 ### Temporary stand-ins
-- `UnlimitedWallet` pays for everything until Phase 3 adds gold. `MergeBoardService.Wallet` is swapped then.
-- Board growth is triggered from the debug overlay until the HQ (Phase 3) unlocks slots.
+- Phase 3 replaced the `UnlimitedWallet` with the real wallet and the debug board-growth button with HQ upgrades.
 - Text uses legacy uGUI `Text` with the built-in font. TextMeshPro needs its Essentials imported in the Editor
   before runtime-created text renders; switching to TMP is planned with localization in Phase 7 (needed for Arabic).
 - `Strings` is a small in-code English table. Every UI string already goes through it by key, so Phase 7 can swap
@@ -78,3 +77,24 @@ not written by hand (spec Section 2). They get committed after the first open (P
 Unity-side code is compiled against UnityEngine/UnityEditor 2021.1 and UnityEngine.UI 2020.3 reference assemblies
 (NuGet `Unity3D.SDK`, `Unity3D.UnityEngine.UI`), with generated facade assemblies for the UnityEngine modules.
 It catches API and type errors, but not Unity 6-specific API changes.
+
+## Phase 3
+
+### Economy numbers (EconomyConfig asset)
+- **Gold Mine:** 1 gold/s at L1, ×2.1 per level. Merging two mines (2 × L1 = 2/s) gives one L2 at 2.1/s and frees a
+  slot, so merging always pays a little.
+- **Barracks:** 2% off unit prices per Barracks level, summed across all Barracks, capped at 50%. Buildings are never discounted.
+- **Warehouse:** the offline cap is 8 h + 0.5 h per Warehouse level, capped at 24 h.
+- **Offline rate:** 100% of normal income (the multiplier is in the asset if you want less).
+- **Starting balance:** 500 gold, which is enough for a Gold Mine plus a few units. 0 gems; gems come from stars later.
+- **HQ:** 10 levels, each costing 5× the previous (2,000 for level 2, up to 781 M for level 10). Levels 2 to 5 grow the board
+  (5x5, 5x6, 6x6, 6x7). Every level raises the highest buy level, from L5 to L30. Trait unlocks per HQ level have a
+  slot in the data, filled in Phase 5.
+
+### Time away
+- Income is paid in `EconomyService.Tick(now)`, called every frame. A gap between ticks longer than 60 s counts as time
+  away. The same rule covers a cold start (the last active time is saved) and coming back from the background, so there
+  is one code path to test.
+- Offline gold is added immediately. The popup only reports it, so closing the app before tapping Collect loses nothing.
+- If the clock moves backwards (the device time was changed), nothing is paid and the game carries on from the new time.
+- `OffsetClock` lets the debug panel fake time away without changing the device clock.

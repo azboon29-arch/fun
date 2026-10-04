@@ -35,14 +35,15 @@ namespace Game.Tests
         public static readonly DateTime Start = new DateTime(2026, 1, 1, 12, 0, 0, DateTimeKind.Utc);
 
         public readonly MemorySaveStorage Storage;
-        public readonly EventBus Bus = new EventBus();
+        public readonly EventBus Bus;
         public readonly ManualClock Clock = new ManualClock(Start);
         public readonly SaveSettings Settings = new SaveSettings("save", AutosaveDelay);
         public readonly SaveService Service;
         public readonly FakeSection Section;
 
-        public SaveRig(MemorySaveStorage storage = null, SaveMigrator migrator = null, FakeSection section = null)
+        public SaveRig(MemorySaveStorage storage = null, SaveMigrator migrator = null, FakeSection section = null, EventBus bus = null)
         {
+            Bus = bus ?? new EventBus();
             Storage = storage ?? new MemorySaveStorage();
             Service = new SaveService(Storage, migrator ?? new SaveMigrator(SaveFormat.CurrentVersion), Bus, Clock,
                 NullGameLog.Instance, Settings);

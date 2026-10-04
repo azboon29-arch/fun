@@ -3,7 +3,7 @@ using Game.Core;
 using Game.Core.Events;
 using Game.Core.Save;
 using Game.Core.Services;
-using Game.Logic.Merge;
+using Game.Logic.Economy;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -11,17 +11,20 @@ namespace Game.App
 {
     /// <summary>
     /// Development-only overlay (IMGUI, collapsed by default) showing save status, with buttons to save, reset the save,
-    /// grow the board and switch scenes.
+    /// add gold, simulate time away and switch scenes.
     /// </summary>
     public sealed class DebugOverlay : MonoBehaviour
     {
         private const float ReferenceWidth = 1080f;
         private const int FontSize = 36;
         private const float Margin = 24f;
+        private const long DebugGold = 10000;
+        private const int DebugAwayHours = 2;
         private const float TopOffset = 170f; // below the Base screen's top bar
 
         private SaveService _save;
-        private MergeBoardService _board;
+        private CurrencyWallet _wallet;
+        private OffsetClock _clock;
         private IDisposable _savedSub;
         private string _lastEvent = "-";
         private bool _expanded;
@@ -33,7 +36,8 @@ namespace Game.App
             var services = GameServices.Current;
             if (services == null) return;
             _save = services.Get<SaveService>();
-            services.TryGet(out _board);
+            services.TryGet(out _wallet);
+            services.TryGet(out _clock);
             _savedSub = services.Get<EventBus>().Subscribe<GameSaved>(e =>
                 _lastEvent = "Saved " + DateTimeOffset.FromUnixTimeSeconds(e.SavedAtUnixSeconds).ToLocalTime().ToString("T"));
         }
@@ -61,10 +65,11 @@ namespace Game.App
                 if (GUILayout.Button("Delete save", _button)) _save.DeleteAll();
                 GUILayout.EndHorizontal();
 
-                if (_board != null && GUILayout.Button($"Grow board ({_board.Board.Columns}x{_board.Board.Rows})", _button))
-                {
-                    _board.Expand(_board.Board.Columns + 1, _board.Board.Rows + 1);
-                }
+                GUILayout.BeginHorizontal();
+                if (_wallet != null && GUILayout.Button($"+{DebugGold:N0} gold", _button)) _wallet.Add(Currency.Gold, DebugGold);
+                // Jumps the game clock forward, as if the player left; the next frame pays offline earnings.
+                if (_clock != null && GUILayout.Button($"Away {DebugAwayHours}h", _button)) _clock.Offset += TimeSpan.FromHours(DebugAwayHours);
+                GUILayout.EndHorizontal();
 
                 GUILayout.BeginHorizontal();
                 if (GUILayout.Button(SceneNames.Base, _button)) SceneManager.LoadScene(SceneNames.Base);

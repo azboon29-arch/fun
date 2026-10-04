@@ -2,6 +2,7 @@ using Game.Data;
 using Game.Logic.Merge;
 using UnityEditor;
 using UnityEngine;
+using Object = UnityEngine.Object;
 
 namespace Game.Editor
 {
@@ -12,6 +13,7 @@ namespace Game.Editor
     public static class DefaultContent
     {
         private const string MergeConfigPath = EditorPaths.Data + "/MergeConfig.asset";
+        private const string EconomyConfigPath = EditorPaths.Data + "/EconomyConfig.asset";
 
         // First-pass balance. See DESIGN_NOTES.md (Phase 2) for the reasoning.
         private const int MaxLevel = 30;
@@ -21,16 +23,44 @@ namespace Game.Editor
         /// <summary>Creates any missing default assets and assigns them to <paramref name="config"/>.</summary>
         public static void EnsureAll(GameConfig config)
         {
-            var merge = LoadOrCreateMergeConfig();
             var serialized = new SerializedObject(config);
-            var property = serialized.FindProperty("mergeConfig");
-            if (property.objectReferenceValue == null)
-            {
-                property.objectReferenceValue = merge;
-                serialized.ApplyModifiedPropertiesWithoutUndo();
-                EditorUtility.SetDirty(config);
-            }
+            Assign(serialized, "mergeConfig", LoadOrCreateMergeConfig());
+            Assign(serialized, "economyConfig", LoadOrCreateEconomyConfig());
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(config);
             AssetDatabase.SaveAssets();
+        }
+
+        private static void Assign(SerializedObject serialized, string field, Object asset)
+        {
+            var property = serialized.FindProperty(field);
+            if (property.objectReferenceValue == null) property.objectReferenceValue = asset;
+        }
+
+        private static EconomyConfigAsset LoadOrCreateEconomyConfig()
+        {
+            var asset = AssetDatabase.LoadAssetAtPath<EconomyConfigAsset>(EconomyConfigPath);
+            if (asset != null) return asset;
+
+            SceneBuilder.EnsureFolder(EditorPaths.Data);
+            asset = ScriptableObject.CreateInstance<EconomyConfigAsset>();
+            // HQ: each level costs 5x the previous. The first levels grow the board (4x5 to 6x7), later ones
+            // raise the highest buy level. See DESIGN_NOTES.md (Phase 3).
+            asset.SetHqLevels(new[]
+            {
+                new EconomyConfigAsset.HqLevelEntry(0, 4, 5, 5),
+                new EconomyConfigAsset.HqLevelEntry(2_000, 5, 5, 7),
+                new EconomyConfigAsset.HqLevelEntry(10_000, 5, 6, 9),
+                new EconomyConfigAsset.HqLevelEntry(50_000, 6, 6, 11),
+                new EconomyConfigAsset.HqLevelEntry(250_000, 6, 7, 13),
+                new EconomyConfigAsset.HqLevelEntry(1_250_000, 6, 7, 16),
+                new EconomyConfigAsset.HqLevelEntry(6_250_000, 6, 7, 19),
+                new EconomyConfigAsset.HqLevelEntry(31_250_000, 6, 7, 22),
+                new EconomyConfigAsset.HqLevelEntry(156_250_000, 6, 7, 25),
+                new EconomyConfigAsset.HqLevelEntry(781_250_000, 6, 7, 30),
+            });
+            AssetDatabase.CreateAsset(asset, EconomyConfigPath);
+            return asset;
         }
 
         private static MergeConfigAsset LoadOrCreateMergeConfig()
