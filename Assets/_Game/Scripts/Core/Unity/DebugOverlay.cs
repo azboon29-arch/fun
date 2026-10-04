@@ -3,25 +3,28 @@ using Game.Core;
 using Game.Core.Events;
 using Game.Core.Save;
 using Game.Core.Services;
+using Game.Logic.Merge;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
 namespace Game.App
 {
     /// <summary>
-    /// Development-only overlay (IMGUI) showing save status, with buttons to save, reset the save and switch scenes.
-    /// Replaced by real UI from Phase 2 onwards; kept for debugging.
+    /// Development-only overlay (IMGUI, collapsed by default) showing save status, with buttons to save, reset the save,
+    /// grow the board and switch scenes.
     /// </summary>
     public sealed class DebugOverlay : MonoBehaviour
     {
         private const float ReferenceWidth = 1080f;
         private const int FontSize = 36;
         private const float Margin = 24f;
+        private const float TopOffset = 170f; // below the Base screen's top bar
 
         private SaveService _save;
+        private MergeBoardService _board;
         private IDisposable _savedSub;
         private string _lastEvent = "-";
-        private bool _expanded = true;
+        private bool _expanded;
         private GUIStyle _label;
         private GUIStyle _button;
 
@@ -30,6 +33,7 @@ namespace Game.App
             var services = GameServices.Current;
             if (services == null) return;
             _save = services.Get<SaveService>();
+            services.TryGet(out _board);
             _savedSub = services.Get<EventBus>().Subscribe<GameSaved>(e =>
                 _lastEvent = "Saved " + DateTimeOffset.FromUnixTimeSeconds(e.SavedAtUnixSeconds).ToLocalTime().ToString("T"));
         }
@@ -44,7 +48,7 @@ namespace Game.App
             EnsureStyles();
 
             var width = ReferenceWidth - Margin * 2;
-            GUILayout.BeginArea(new Rect(Margin, Margin + Screen.safeArea.yMin / scale, width, Screen.height / scale));
+            GUILayout.BeginArea(new Rect(Margin, TopOffset + (Screen.height - Screen.safeArea.yMax) / scale, width, Screen.height / scale));
             if (GUILayout.Button(_expanded ? "▼ Debug" : "▶ Debug", _button)) _expanded = !_expanded;
             if (_expanded)
             {
@@ -56,6 +60,11 @@ namespace Game.App
                 if (GUILayout.Button("Save now", _button)) _save.Save();
                 if (GUILayout.Button("Delete save", _button)) _save.DeleteAll();
                 GUILayout.EndHorizontal();
+
+                if (_board != null && GUILayout.Button($"Grow board ({_board.Board.Columns}x{_board.Board.Rows})", _button))
+                {
+                    _board.Expand(_board.Board.Columns + 1, _board.Board.Rows + 1);
+                }
 
                 GUILayout.BeginHorizontal();
                 if (GUILayout.Button(SceneNames.Base, _button)) SceneManager.LoadScene(SceneNames.Base);
