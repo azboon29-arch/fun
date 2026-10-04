@@ -1,4 +1,5 @@
 using Game.Data;
+using Game.Logic.Battle;
 using Game.Logic.Merge;
 using UnityEditor;
 using UnityEngine;
@@ -14,6 +15,9 @@ namespace Game.Editor
     {
         private const string MergeConfigPath = EditorPaths.Data + "/MergeConfig.asset";
         private const string EconomyConfigPath = EditorPaths.Data + "/EconomyConfig.asset";
+        private const string BattleConfigPath = EditorPaths.Data + "/BattleConfig.asset";
+        private const string CampaignConfigPath = EditorPaths.Data + "/CampaignConfig.asset";
+        private const float UnitGrowth = 1.9f;
 
         // First-pass balance. See DESIGN_NOTES.md (Phase 2) for the reasoning.
         private const int MaxLevel = 30;
@@ -26,6 +30,8 @@ namespace Game.Editor
             var serialized = new SerializedObject(config);
             Assign(serialized, "mergeConfig", LoadOrCreateMergeConfig());
             Assign(serialized, "economyConfig", LoadOrCreateEconomyConfig());
+            Assign(serialized, "battleConfig", LoadOrCreateBattleConfig());
+            Assign(serialized, "campaignConfig", LoadOrCreateCampaignConfig());
             serialized.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(config);
             AssetDatabase.SaveAssets();
@@ -82,6 +88,61 @@ namespace Game.Editor
             AssetDatabase.CreateAsset(asset, MergeConfigPath);
             return asset;
         }
+
+        private static BattleConfigAsset LoadOrCreateBattleConfig()
+        {
+            var asset = AssetDatabase.LoadAssetAtPath<BattleConfigAsset>(BattleConfigPath);
+            if (asset != null) return asset;
+
+            SceneBuilder.EnsureFolder(EditorPaths.Data);
+            asset = ScriptableObject.CreateInstance<BattleConfigAsset>();
+            // Infantry: fast, short range. Artillery: long range, fragile, slow. Armor: tough, slow hitter.
+            // See DESIGN_NOTES.md (Phase 4).
+            asset.SetUnits(new[]
+            {
+                new BattleConfigAsset.UnitEntry("infantry", UnitClass.Infantry, 100, 12, 1.2f, 1f, 1.5f, UnitGrowth),
+                new BattleConfigAsset.UnitEntry("artillery", UnitClass.Artillery, 60, 18, 5f, 1.5f, 0.8f, UnitGrowth),
+                new BattleConfigAsset.UnitEntry("armor", UnitClass.Armor, 200, 10, 1.5f, 1.25f, 1f, UnitGrowth),
+            });
+            AssetDatabase.CreateAsset(asset, BattleConfigPath);
+            return asset;
+        }
+
+        private static CampaignConfigAsset LoadOrCreateCampaignConfig()
+        {
+            var asset = AssetDatabase.LoadAssetAtPath<CampaignConfigAsset>(CampaignConfigPath);
+            if (asset != null) return asset;
+
+            SceneBuilder.EnsureFolder(EditorPaths.Data);
+            asset = ScriptableObject.CreateInstance<CampaignConfigAsset>();
+            // Three test levels; Phase 6 adds the full campaign.
+            asset.SetLevels(new[]
+            {
+                new CampaignConfigAsset.LevelEntry("1-1", "Border Post", 4, 90, 8, 300, 101, new[]
+                {
+                    Enemy(FormationRow.Front, 1, "infantry", 1),
+                    Enemy(FormationRow.Front, 3, "infantry", 1),
+                }),
+                new CampaignConfigAsset.LevelEntry("1-2", "River Crossing", 5, 90, 10, 600, 102, new[]
+                {
+                    Enemy(FormationRow.Front, 1, "infantry", 2),
+                    Enemy(FormationRow.Front, 3, "infantry", 2),
+                    Enemy(FormationRow.Back, 2, "artillery", 1),
+                }),
+                new CampaignConfigAsset.LevelEntry("1-3", "Iron Gate", 6, 90, 12, 1200, 103, new[]
+                {
+                    Enemy(FormationRow.Front, 2, "armor", 3),
+                    Enemy(FormationRow.Front, 1, "infantry", 2),
+                    Enemy(FormationRow.Front, 3, "infantry", 2),
+                    Enemy(FormationRow.Back, 2, "artillery", 2),
+                }),
+            });
+            AssetDatabase.CreateAsset(asset, CampaignConfigPath);
+            return asset;
+        }
+
+        private static CampaignConfigAsset.EnemyEntry Enemy(FormationRow row, int column, string unitId, int level) =>
+            new CampaignConfigAsset.EnemyEntry(row, column, unitId, level);
 
         private static MergeConfigAsset.ItemEntry Entry(string id, ItemKind kind, long baseCost, Color color, string label) =>
             new MergeConfigAsset.ItemEntry(id, "item." + id, kind, MaxLevel, baseCost, PurchaseGrowth, LevelMultiplier, color, label);

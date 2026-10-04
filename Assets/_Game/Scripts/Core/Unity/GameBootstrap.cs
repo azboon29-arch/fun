@@ -6,6 +6,7 @@ using Game.Core.Save;
 using Game.Core.Services;
 using Game.Data;
 using Game.Logic.Base;
+using Game.Logic.Campaign;
 using Game.Logic.Economy;
 using Game.Logic.Merge;
 using UnityEngine;
@@ -80,9 +81,10 @@ namespace Game.App
             services.Register(_save);
 
             // Every system with saved state registers its ISaveSection here, before Load().
-            if (config.MergeConfig == null || config.EconomyConfig == null)
+            if (config.MergeConfig == null || config.EconomyConfig == null || config.BattleConfig == null || config.CampaignConfig == null)
             {
-                throw new InvalidOperationException("GameConfig is missing MergeConfig or EconomyConfig. Run Tools > Merge Command > Build Scenes.");
+                throw new InvalidOperationException(
+                    "GameConfig is missing a content asset (Merge, Economy, Battle or Campaign). Run Tools > Merge Command > Build Scenes.");
             }
             var mergeConfig = config.MergeConfig.ToModel();
             var economyConfig = config.EconomyConfig.ToEconomy();
@@ -90,21 +92,30 @@ namespace Game.App
             foreach (var error in mergeConfig.Validate()) log.Error("MergeConfig: " + error);
             foreach (var error in economyConfig.Validate()) log.Error("EconomyConfig: " + error);
             foreach (var error in hqConfig.Validate()) log.Error("EconomyConfig HQ: " + error);
+            var battleConfig = config.BattleConfig.ToModel();
+            var campaignConfig = config.CampaignConfig.ToModel();
+            foreach (var error in battleConfig.Validate()) log.Error("BattleConfig: " + error);
+            foreach (var error in campaignConfig.Validate(battleConfig)) log.Error("CampaignConfig: " + error);
 
             var wallet = new CurrencyWallet(bus, economyConfig.StartingGold, economyConfig.StartingGems);
             // Board placement only needs to be unpredictable, not replayable, so a time-based seed is fine.
             var board = new MergeBoardService(mergeConfig, bus, new DeterministicRandom(clock.UtcNow.Ticks), wallet);
             _economy = new EconomyService(economyConfig, wallet, board, bus);
             var hq = new HqService(hqConfig, wallet, board, bus);
+            var progress = new CampaignProgress(campaignConfig, bus);
+            var battles = new BattleService(battleConfig, campaignConfig, progress, board, wallet, bus);
 
             services.Register(wallet);
             services.Register(board);
             services.Register(_economy);
             services.Register(hq);
+            services.Register(progress);
+            services.Register(battles);
             _save.Register(wallet);
             _save.Register(board);
             _save.Register(_economy);
             _save.Register(hq);
+            _save.Register(progress);
 
             if (config.ShowDebugOverlay && (Application.isEditor || Debug.isDebugBuild))
             {

@@ -35,6 +35,50 @@ namespace Game.Tests
         }
 
         [Test]
+        public void PlaceInFreeSlot_UsesClassRows_AndRespectsLimit()
+        {
+            var rig = new BattleRig();
+            rig.Put(0, 0, "artillery", 1);
+            rig.Put(1, 0, "infantry", 1);
+            rig.Put(2, 0, "infantry", 1);
+            rig.Put(3, 0, "infantry", 1);
+            var roster = rig.Service.Roster();
+            var artillery = roster.First(u => u.Item.TypeId == "artillery");
+            Assert.That(rig.Service.PlaceInFreeSlot("1-1", artillery), Is.True);
+            Assert.That(rig.Service.PlaceInFreeSlot("1-1", artillery), Is.False, "already placed");
+            var placed = rig.Service.FormationFor("1-1").Get(FormationRow.Back, 2);
+            Assert.That(placed?.UnitId, Is.EqualTo("artillery"), "artillery goes to the back row, centre lane");
+
+            var infantry = roster.Where(u => u.Item.TypeId == "infantry").ToList();
+            Assert.That(rig.Service.PlaceInFreeSlot("1-1", infantry[0]), Is.True);
+            Assert.That(rig.Service.FormationFor("1-1").Get(FormationRow.Front, 2)?.UnitId, Is.EqualTo("infantry"));
+            Assert.That(rig.Service.PlaceInFreeSlot("1-1", infantry[1]), Is.True);
+            Assert.That(rig.Service.FormationFor("1-1").Get(FormationRow.Front, 1).HasValue, Is.True, "next lane left of centre");
+            Assert.That(rig.Service.PlaceInFreeSlot("1-1", infantry[2]), Is.False, "limit of 3 reached");
+        }
+
+        [Test]
+        public void MoveOrSwap_SwapsOccupiedSlots()
+        {
+            var rig = new BattleRig();
+            rig.Put(0, 0, "armor", 2);
+            rig.Put(1, 0, "infantry", 1);
+            rig.Service.AutoFill("1-1");
+            var f = rig.Service.FormationFor("1-1");
+            Assert.That(f.Get(FormationRow.Front, 2)?.UnitId, Is.EqualTo("armor"));
+            Assert.That(f.Get(FormationRow.Front, 1)?.UnitId, Is.EqualTo("infantry"));
+
+            Assert.That(rig.Service.MoveOrSwap("1-1", (FormationRow.Front, 2), (FormationRow.Front, 1)), Is.True);
+            Assert.That(f.Get(FormationRow.Front, 1)?.UnitId, Is.EqualTo("armor"));
+            Assert.That(f.Get(FormationRow.Front, 2)?.UnitId, Is.EqualTo("infantry"));
+
+            Assert.That(rig.Service.MoveOrSwap("1-1", (FormationRow.Front, 1), (FormationRow.Back, 4)), Is.True);
+            Assert.That(f.Get(FormationRow.Front, 1), Is.Null);
+            Assert.That(f.Get(FormationRow.Back, 4)?.SourceCell, Is.EqualTo(new Game.Logic.Merge.Cell(0, 0)));
+            Assert.That(f.Count, Is.EqualTo(2));
+        }
+
+        [Test]
         public void CanStart_ChecksLockAndFormation()
         {
             var rig = new BattleRig();

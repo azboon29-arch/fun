@@ -154,24 +154,53 @@ namespace Game.Logic.Campaign
         {
             var level = _campaign.Find(levelId);
             if (level == null) return;
+            FormationFor(levelId).Clear();
+            foreach (var unit in Roster().Take(level.DeploymentLimit)) PlaceInFreeSlot(levelId, unit);
+        }
+
+        /// <summary>
+        /// Places <paramref name="unit"/> in the first free slot that suits its class (Artillery at the back, others at
+        /// the front, centre lanes first). Returns false when the formation is full or at the deployment limit.
+        /// </summary>
+        public bool PlaceInFreeSlot(string levelId, RosterUnit unit)
+        {
+            var level = _campaign.Find(levelId);
+            if (level == null) return false;
             var formation = FormationFor(levelId);
-            formation.Clear();
-            var lanes = CentreOutLanes();
-            foreach (var unit in Roster().Take(level.DeploymentLimit))
+            if (formation.Uses(unit.Cell) || formation.Count >= level.DeploymentLimit) return false;
+            var backFirst = unit.Stats.Class == UnitClass.Artillery;
+            for (var r = 0; r < Formation.RowCount; r++)
             {
-                var backFirst = unit.Stats.Class == UnitClass.Artillery;
-                var placed = false;
-                for (var r = 0; r < Formation.RowCount && !placed; r++)
+                var row = (FormationRow)(backFirst ? Formation.RowCount - 1 - r : r);
+                foreach (var column in CentreOutLanes)
                 {
-                    var row = (FormationRow)(backFirst ? Formation.RowCount - 1 - r : r);
-                    foreach (var column in lanes)
-                    {
-                        if (formation.Get(row, column).HasValue) continue;
-                        placed = formation.Place(new FormationEntry(row, column, unit.Item.TypeId, unit.Item.Level, unit.Cell), level.DeploymentLimit);
-                        break;
-                    }
+                    if (formation.Get(row, column).HasValue) continue;
+                    return formation.Place(new FormationEntry(row, column, unit.Item.TypeId, unit.Item.Level, unit.Cell), level.DeploymentLimit);
                 }
             }
+            return false;
+        }
+
+        /// <summary>
+        /// Moves the unit in slot <paramref name="from"/> to slot <paramref name="to"/>, swapping with whatever is there.
+        /// </summary>
+        public bool MoveOrSwap(string levelId, (FormationRow Row, int Column) from, (FormationRow Row, int Column) to)
+        {
+            var formation = FormationFor(levelId);
+            var moving = formation.Get(from.Row, from.Column);
+            if (!moving.HasValue || !Formation.IsValidSlot(to.Row, to.Column)) return false;
+            if (from == to) return true;
+            var other = formation.Get(to.Row, to.Column);
+            formation.Remove(from.Row, from.Column);
+            formation.Remove(to.Row, to.Column);
+            var m = moving.Value;
+            formation.Place(new FormationEntry(to.Row, to.Column, m.UnitId, m.Level, m.SourceCell), int.MaxValue);
+            if (other.HasValue)
+            {
+                var o = other.Value;
+                formation.Place(new FormationEntry(from.Row, from.Column, o.UnitId, o.Level, o.SourceCell), int.MaxValue);
+            }
+            return true;
         }
 
         /// <summary>Checks whether a battle on <paramref name="levelId"/> can start now.</summary>
@@ -219,7 +248,10 @@ namespace Game.Logic.Campaign
             return reward;
         }
 
-        private static List<int> CentreOutLanes()
+        /// <summary>Lane order used when filling a row: centre first, then alternating outwards.</summary>
+        private static readonly List<int> CentreOutLanes = BuildCentreOutLanes();
+
+        private static List<int> BuildCentreOutLanes()
         {
             var centre = (Formation.ColumnCount - 1) / 2;
             var lanes = new List<int> { centre };
