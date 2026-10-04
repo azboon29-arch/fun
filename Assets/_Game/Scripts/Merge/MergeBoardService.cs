@@ -65,14 +65,25 @@ namespace Game.Logic.Merge
         public int BuyLevel(string typeId)
         {
             var max = _config.TryGetItem(typeId, out var def) ? def.MaxLevel : 1;
+            max = Math.Min(max, Math.Max(1, BuyLevelCap));
             return Math.Min(max, Math.Max(1, HighestLevel(typeId) - _config.BuyLevelOffset));
         }
 
-        /// <summary>Gold cost of the next purchase of <paramref name="typeId"/>. Throws for unknown types.</summary>
+        /// <summary>Highest level purchases may arrive at (set by the HQ). Unlimited by default.</summary>
+        public int BuyLevelCap { get; set; } = int.MaxValue;
+
+        /// <summary>Optional price adjustment (e.g. Barracks discount). Null means no adjustment.</summary>
+        public IBuyCostModifier CostModifier { get; set; }
+
+        /// <summary>Gold cost of the next purchase of <paramref name="typeId"/>, after <see cref="CostModifier"/>. Throws for unknown types.</summary>
         public long BuyCost(string typeId)
         {
             if (!_config.TryGetItem(typeId, out var def)) throw new ArgumentException($"Unknown item type '{typeId}'.", nameof(typeId));
-            return def.CostOf(BuyLevel(typeId), PurchaseCount(typeId));
+            var cost = def.CostOf(BuyLevel(typeId), PurchaseCount(typeId));
+            if (CostModifier == null) return cost;
+            var multiplier = Math.Max(0d, CostModifier.CostMultiplier(def));
+            var adjusted = cost * multiplier;
+            return adjusted >= long.MaxValue ? long.MaxValue : (long)Math.Round(adjusted, MidpointRounding.AwayFromZero);
         }
 
         /// <summary>Drops the item at <paramref name="from"/> onto <paramref name="to"/> (move, swap or merge).</summary>
@@ -121,6 +132,15 @@ namespace Game.Logic.Merge
             _bus.Publish(new ItemBought(cell.Value, item, cost));
             Changed("buy");
             return cell;
+        }
+
+        /// <summary>All items of type <paramref name="typeId"/> currently on the board.</summary>
+        public IEnumerable<BoardItem> ItemsOfType(string typeId)
+        {
+            foreach (var pair in Board.Items())
+            {
+                if (pair.Value.TypeId == typeId) yield return pair.Value;
+            }
         }
 
         /// <summary>Grows the board, clamped to the config's max size. Never shrinks. Returns true if the size changed.</summary>

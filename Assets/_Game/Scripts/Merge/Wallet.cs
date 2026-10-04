@@ -1,6 +1,13 @@
 namespace Game.Logic.Merge
 {
-    /// <summary>Pays for purchases. Phase 3 replaces the stub with the real gold wallet.</summary>
+    /// <summary>Adjusts purchase prices, e.g. the Barracks discount on units.</summary>
+    public interface IBuyCostModifier
+    {
+        /// <summary>Multiplier applied to the base price of <paramref name="item"/> (1 = unchanged, 0.8 = 20% off).</summary>
+        double CostMultiplier(ItemDefinition item);
+    }
+
+    /// <summary>Pays for purchases.</summary>
     public interface IGoldWallet
     {
         /// <summary>Gold available.</summary>
@@ -10,7 +17,7 @@ namespace Game.Logic.Merge
         bool TrySpend(long amount);
     }
 
-    /// <summary>A wallet that can always pay. Used until the economy exists (Phase 3).</summary>
+    /// <summary>A wallet that can always pay. Used by tests and debug tools.</summary>
     public sealed class UnlimitedWallet : IGoldWallet
     {
         /// <inheritdoc />
