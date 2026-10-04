@@ -5,6 +5,8 @@ using Game.Core.Random;
 using Game.Core.Save;
 using Game.Core.Services;
 using Game.Data;
+using Game.Logic.Base;
+using Game.Logic.Economy;
 using Game.Logic.Merge;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -23,6 +25,8 @@ namespace Game.App
         [SerializeField] private string firstScene = SceneNames.Base;
 
         private SaveService _save;
+        private EconomyService _economy;
+        private IClock _clock;
 
         /// <summary>True once services exist. Scenes opened directly in the Editor use this to boot first.</summary>
         public static bool IsBooted => GameServices.Current != null;
@@ -59,12 +63,15 @@ namespace Game.App
             var services = new GameServices();
             var log = new UnityGameLog();
             var bus = new EventBus();
-            var clock = new SystemClock();
+            // The offset lets debug tools simulate time away; it stays zero in normal play.
+            var clock = new OffsetClock(new SystemClock());
+            _clock = clock;
 
             services.Register(config);
             services.Register<IGameLog>(log);
             services.Register(bus);
             services.Register<IClock>(clock);
+            services.Register(clock);
             services.Register<IAudioService>(new NullAudioService());
 
             var migrator = new SaveMigrator(SaveFormat.CurrentVersion);
@@ -73,16 +80,31 @@ namespace Game.App
             services.Register(_save);
 
             // Every system with saved state registers its ISaveSection here, before Load().
-            if (config.MergeConfig == null)
+            if (config.MergeConfig == null || config.EconomyConfig == null)
             {
-                throw new InvalidOperationException("GameConfig has no MergeConfig. Run Tools > Merge Command > Build Scenes.");
+                throw new InvalidOperationException("GameConfig is missing MergeConfig or EconomyConfig. Run Tools > Merge Command > Build Scenes.");
             }
             var mergeConfig = config.MergeConfig.ToModel();
+            var economyConfig = config.EconomyConfig.ToEconomy();
+            var hqConfig = config.EconomyConfig.ToHq();
             foreach (var error in mergeConfig.Validate()) log.Error("MergeConfig: " + error);
+            foreach (var error in economyConfig.Validate()) log.Error("EconomyConfig: " + error);
+            foreach (var error in hqConfig.Validate()) log.Error("EconomyConfig HQ: " + error);
+
+            var wallet = new CurrencyWallet(bus, economyConfig.StartingGold, economyConfig.StartingGems);
             // Board placement only needs to be unpredictable, not replayable, so a time-based seed is fine.
-            var board = new MergeBoardService(mergeConfig, bus, new DeterministicRandom(clock.UtcNow.Ticks), new UnlimitedWallet());
+            var board = new MergeBoardService(mergeConfig, bus, new DeterministicRandom(clock.UtcNow.Ticks), wallet);
+            _economy = new EconomyService(economyConfig, wallet, board, bus);
+            var hq = new HqService(hqConfig, wallet, board, bus);
+
+            services.Register(wallet);
             services.Register(board);
+            services.Register(_economy);
+            services.Register(hq);
+            _save.Register(wallet);
             _save.Register(board);
+            _save.Register(_economy);
+            _save.Register(hq);
 
             if (config.ShowDebugOverlay && (Application.isEditor || Debug.isDebugBuild))
             {
@@ -93,29 +115,38 @@ namespace Game.App
 
         private void Update()
         {
+            // Pays mine income (or offline earnings after a long gap), then autosaves if anything changed.
+            _economy?.Tick(_clock.UtcNow);
             _save?.Tick();
         }
 
         private void OnApplicationPause(bool paused)
         {
-            if (paused) _save?.Flush();
+            // Ticking first records the exact moment the player left; resuming pays the time away.
+            _economy?.Tick(_clock.UtcNow);
+            if (paused) FlushNow();
         }
 
         private void OnApplicationFocus(bool focused)
         {
             // Some Android devices skip OnApplicationPause when the app is swiped away.
-            if (!focused) _save?.Flush();
+            if (!focused) FlushNow();
         }
 
-        private void OnApplicationQuit()
+        private void OnApplicationQuit() => FlushNow();
+
+        private void FlushNow()
         {
-            _save?.Flush();
+            if (_save == null) return;
+            _economy?.Tick(_clock.UtcNow);
+            _save.MarkDirty(); // always store the latest "last active" time
+            _save.Flush();
         }
 
         private void OnDestroy()
         {
             if (_save == null) return;
-            _save.Flush();
+            FlushNow();
             _save.Dispose();
             GameServices.SetCurrent(null);
         }

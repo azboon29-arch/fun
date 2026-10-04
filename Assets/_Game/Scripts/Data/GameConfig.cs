@@ -22,6 +22,9 @@ namespace Game.Data
         [Tooltip("Merge board rules and item types.")]
         [SerializeField] private MergeConfigAsset mergeConfig;
 
+        [Tooltip("Currencies, buildings, offline earnings and HQ levels.")]
+        [SerializeField] private EconomyConfigAsset economyConfig;
+
         [Header("Display")]
         [Tooltip("Target frame rate on device.")]
         [SerializeField] private int targetFrameRate = 60;
@@ -32,6 +35,9 @@ namespace Game.Data
 
         /// <summary>Merge board rules and item types.</summary>
         public MergeConfigAsset MergeConfig => mergeConfig;
+
+        /// <summary>Currencies, buildings, offline earnings and HQ levels.</summary>
+        public EconomyConfigAsset EconomyConfig => economyConfig;
 
         /// <summary>Target frame rate on device.</summary>
         public int TargetFrameRate => targetFrameRate;

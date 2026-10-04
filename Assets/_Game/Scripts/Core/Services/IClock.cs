@@ -28,4 +28,22 @@ namespace Game.Core.Services
         /// <summary>Moves the clock forward by <paramref name="delta"/>.</summary>
         public void Advance(TimeSpan delta) { UtcNow = UtcNow + delta; }
     }
+
+    /// <summary>
+    /// Wraps another clock and adds an adjustable offset. Debug tools use it to simulate time away
+    /// (offline earnings) without touching the device clock.
+    /// </summary>
+    public sealed class OffsetClock : IClock
+    {
+        private readonly IClock _inner;
+
+        /// <summary>Creates a clock that follows <paramref name="inner"/> plus <see cref="Offset"/>.</summary>
+        public OffsetClock(IClock inner) { _inner = inner ?? throw new ArgumentNullException(nameof(inner)); }
+
+        /// <summary>Time added to the inner clock.</summary>
+        public TimeSpan Offset { get; set; }
+
+        /// <inheritdoc />
+        public DateTime UtcNow => _inner.UtcNow + Offset;
+    }
 }
