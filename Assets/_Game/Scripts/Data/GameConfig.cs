@@ -18,6 +18,10 @@ namespace Game.Data
         [Min(0f)]
         [SerializeField] private float autosaveDelaySeconds = 2f;
 
+        [Header("Content")]
+        [Tooltip("Merge board rules and item types.")]
+        [SerializeField] private MergeConfigAsset mergeConfig;
+
         [Header("Display")]
         [Tooltip("Target frame rate on device.")]
         [SerializeField] private int targetFrameRate = 60;
@@ -25,6 +29,9 @@ namespace Game.Data
         [Header("Debug")]
         [Tooltip("Shows the debug overlay (save status, reset save) in development builds and the Editor.")]
         [SerializeField] private bool showDebugOverlay = true;
+
+        /// <summary>Merge board rules and item types.</summary>
+        public MergeConfigAsset MergeConfig => mergeConfig;
 
         /// <summary>Target frame rate on device.</summary>
         public int TargetFrameRate => targetFrameRate;

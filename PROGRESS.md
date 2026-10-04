@@ -3,7 +3,7 @@
 | Phase | Status |
 |---|---|
 | 1. Foundation | Code done; waiting for first open in the Unity Editor |
-| 2. Merge Board | Not started |
+| 2. Merge Board | Code done; waiting for an Editor play test |
 | 3. Economy and Base | Not started |
 | 4. Battle Core | Not started |
 | 5. Strategy Layer | Not started |
@@ -55,5 +55,43 @@
 - Debug overlay uses IMGUI; real UI arrives with Phase 2.
 - Android/iOS bundle identifier is not set yet.
 
-## Next: Phase 2, Merge Board
-Board model and merge rules, drag-and-drop view, buy button, merge animation hooks.
+## Phase 2: Merge Board
+
+### Done
+- `BoardModel` (plain C#): grid of slots, move / swap / merge rules, max level per type, random empty slot,
+  growing the board without ever dropping items.
+- `MergeBoardService`: buy into a random empty slot, price rising per purchase of each type, higher buy levels unlocked
+  as you merge (highest level − 5), board full and not-enough-gold refusals that charge nothing, board growth up to
+  6x7, saving under the `board` section. Publishes `ItemMerged`, `ItemBought`, `BuyFailed`, `ItemDragged`, `BoardChanged`.
+- `MergeConfig` asset (`Assets/_Game/Data/MergeConfig.asset`, created by Build Scenes): board sizes, buy-level offset,
+  six item types (Infantry, Artillery, Armor, Gold Mine, Barracks, Warehouse) with prices, colors, labels and an
+  optional sprite each.
+- `DeterministicRandom` (seeded xorshift64*), reused by the battle simulation later.
+- Base screen built from code: currency bar, merge board with drag and drop and a highlighted drop target,
+  one buy button per type showing name, buy level and price, Battle button, message toast. Safe-area aware,
+  1080x1920 reference, touch targets at least 132 px.
+- Feedback hooks: merge punch animation, buy pop-in, and sound hooks (`IAudioService`, silent until Phase 7).
+- `Tools > Merge Command > Validate Data` checks the merge config.
+- Debug overlay (tap "▶ Debug"): Grow board button to test expansion.
+- 86 tests in total; 39 new for merge rules and edge cases (full board, max level, invalid drags, prices,
+  buy level, save round trip, damaged save data, RNG determinism).
+
+### How to try it in the Editor
+1. Do Phase 1 steps 1 to 7 if you have not yet. If you already did, run **Tools > Merge Command > Build Scenes**
+   again: it adds the MergeConfig asset and rebuilds the Base scene.
+2. Press **Play**. The Base screen shows a 4x5 board and six buy buttons.
+3. Tap **Infantry** twice, then drag one Infantry onto the other: they merge into L2 with a bounce.
+4. Drag an item to an empty slot (move) and onto a different item (swap).
+5. Keep buying until the board is full: a message says so and nothing is lost.
+6. Open **▶ Debug** and tap **Grow board** to test expansion (up to 6x7). Stop and press Play again: the board,
+   prices and size are restored from the save.
+7. Run the tests: **Window > General > Test Runner > EditMode > Run All** (86 tests).
+
+### Known issues
+- Gold is unlimited until Phase 3 adds the economy (`UnlimitedWallet`).
+- Text uses Unity's built-in font through legacy uGUI Text, not TextMeshPro yet (see DESIGN_NOTES.md).
+- Not yet run inside Unity: the Unity-side code was compile-checked against Unity reference assemblies
+  (UnityEngine 2021.1 and UnityEngine.UI 2020.3), not Unity 6.
+
+## Next: Phase 3, Economy and Base
+Currencies, gold mines, barracks, warehouse, HQ upgrades, offline earnings, EconomyConfig.

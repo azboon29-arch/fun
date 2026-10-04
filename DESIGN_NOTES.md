@@ -45,3 +45,36 @@ compiles `Game.Core`, `Game.Logic` and the EditMode tests with the .NET SDK and 
 ### Not committed until the first Editor open
 `.meta` files, `ProjectSettings/`, scenes and `.asset` files are created by Unity and the editor scripts,
 not written by hand (spec Section 2). They get committed after the first open (PROGRESS.md step 10).
+
+## Phase 2
+
+### Merge rules
+- Same type and level merges into level + 1 at the **target** slot; the source slot empties.
+- Same type at a different level, or a different type, swaps. An empty target moves.
+- Two identical items already at max level: nothing changes and a message says "Already at max level"
+  (a swap of identical items would look like a bug).
+- Buying checks for space **before** charging, so a full board never costs gold or loses an item.
+- The board only grows (4x5 to 6x7). A save with items outside the stored size grows the board to fit, and two items
+  stored in one cell both survive. Items of a type removed from the config are the only thing dropped on load.
+
+### First-pass prices (MergeConfig asset)
+- Cost = `baseCost × 2^(level−1) × 1.07^purchases`. The level factor of 2 means a level-N purchase costs about the
+  same as the 2^(N−1) level-1 items it replaces. The 1.07 growth is per type, so buying one type does not raise the
+  others' prices.
+- Base costs: Infantry 100, Artillery 120, Armor 150, Gold Mine 200, Warehouse 400, Barracks 500.
+- Buy level = highest level of that type ever owned − 5, minimum 1 (spec example "N−5").
+- Max level 30 for every type. All of these live in the asset, not in code.
+
+### Temporary stand-ins
+- `UnlimitedWallet` pays for everything until Phase 3 adds gold. `MergeBoardService.Wallet` is swapped then.
+- Board growth is triggered from the debug overlay until the HQ (Phase 3) unlocks slots.
+- Text uses legacy uGUI `Text` with the built-in font. TextMeshPro needs its Essentials imported in the Editor
+  before runtime-created text renders; switching to TMP is planned with localization in Phase 7 (needed for Arabic).
+- `Strings` is a small in-code English table. Every UI string already goes through it by key, so Phase 7 can swap
+  in a localization asset without touching call sites.
+- Board placement uses a time-seeded `DeterministicRandom`; placement does not need to be replayable.
+
+### Compile check outside the Editor
+Unity-side code is compiled against UnityEngine/UnityEditor 2021.1 and UnityEngine.UI 2020.3 reference assemblies
+(NuGet `Unity3D.SDK`, `Unity3D.UnityEngine.UI`), with generated facade assemblies for the UnityEngine modules.
+It catches API and type errors, but not Unity 6-specific API changes.

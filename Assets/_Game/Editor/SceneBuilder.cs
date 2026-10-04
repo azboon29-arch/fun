@@ -1,9 +1,12 @@
 using Game.App;
 using Game.Data;
+using System;
+using System.Linq;
 using Game.UI;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
 
 namespace Game.Editor
@@ -37,9 +40,10 @@ namespace Game.Editor
         {
             EnsureFolder(EditorPaths.Scenes);
             var config = LoadOrCreateConfig();
+            DefaultContent.EnsureAll(config);
 
             BuildBoot(config);
-            BuildPlaceholder(SceneNames.Base, BaseBackground, "Base\n(merge board arrives in Phase 2)");
+            BuildBase();
             BuildPlaceholder(SceneNames.Battle, BattleBackground, "Battle\n(arrives in Phase 4)");
 
             EditorBuildSettings.scenes = new[]
@@ -76,6 +80,31 @@ namespace Game.Editor
 
             Save(scene, SceneNames.Boot);
         }
+
+        private static void BuildBase()
+        {
+            var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            CreateCamera(BaseBackground);
+            CreateEventSystem();
+            new GameObject("Base Screen").AddComponent<BaseScreen>();
+            Save(scene, SceneNames.Base);
+        }
+
+        /// <summary>
+        /// Adds an EventSystem for UI input. Uses the Input System's UI module (looked up by name so this compiles
+        /// without a hard reference), falling back to the legacy module.
+        /// </summary>
+        private static void CreateEventSystem()
+        {
+            var go = new GameObject("EventSystem", typeof(EventSystem));
+            var inputSystemModule = AppDomain.CurrentDomain.GetAssemblies()
+                .Select(a => a.GetType(InputSystemUiModule, false))
+                .FirstOrDefault(t => t != null);
+            if (inputSystemModule != null) go.AddComponent(inputSystemModule);
+            else go.AddComponent<StandaloneInputModule>();
+        }
+
+        private const string InputSystemUiModule = "UnityEngine.InputSystem.UI.InputSystemUIInputModule";
 
         private static void BuildPlaceholder(string name, Color background, string caption)
         {

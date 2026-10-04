@@ -1,7 +1,11 @@
+using System;
+using Game.Core.Audio;
 using Game.Core.Events;
+using Game.Core.Random;
 using Game.Core.Save;
 using Game.Core.Services;
 using Game.Data;
+using Game.Logic.Merge;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -61,12 +65,24 @@ namespace Game.App
             services.Register<IGameLog>(log);
             services.Register(bus);
             services.Register<IClock>(clock);
+            services.Register<IAudioService>(new NullAudioService());
 
-            // Systems from later phases register their ISaveSection here, before Load().
             var migrator = new SaveMigrator(SaveFormat.CurrentVersion);
             var storage = new FileSaveStorage(Application.persistentDataPath);
             _save = new SaveService(storage, migrator, bus, clock, log, config.CreateSaveSettings());
             services.Register(_save);
+
+            // Every system with saved state registers its ISaveSection here, before Load().
+            if (config.MergeConfig == null)
+            {
+                throw new InvalidOperationException("GameConfig has no MergeConfig. Run Tools > Merge Command > Build Scenes.");
+            }
+            var mergeConfig = config.MergeConfig.ToModel();
+            foreach (var error in mergeConfig.Validate()) log.Error("MergeConfig: " + error);
+            // Board placement only needs to be unpredictable, not replayable, so a time-based seed is fine.
+            var board = new MergeBoardService(mergeConfig, bus, new DeterministicRandom(clock.UtcNow.Ticks), new UnlimitedWallet());
+            services.Register(board);
+            _save.Register(board);
 
             if (config.ShowDebugOverlay && (Application.isEditor || Debug.isDebugBuild))
             {
